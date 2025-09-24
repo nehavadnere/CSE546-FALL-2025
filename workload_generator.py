@@ -26,14 +26,13 @@ url             = f"http://{args.ip_addr}:8000/"
 image_folder    = args.image_folder
 prediction_file = args.prediction_file
 prediction_df   = pd.read_csv(prediction_file)
-responses       = 0
-err_responses   = 0
+passed_requests     = 0
+failed_requests     = 0
 correct_predictions = 0
 wrong_predictions   = 0
-ex_requests         = []
 
 def send_one_request(image_path):
-    global prediction_df, responses, err_responses, correct_predictions, wrong_predictions, ex_requests
+    global prediction_df, passed_requests, failed_requests, correct_predictions, wrong_predictions
     # Define http payload, "myfile" is the key of the http payload
     file = {"inputFile": open(image_path,'rb')}
     try:
@@ -41,21 +40,21 @@ def send_one_request(image_path):
         # Print error message if failed
         if response.status_code != 200:
             print('sendErr: '+response.url)
-            err_responses +=1
+            failed_requests +=1
         else :
             filename    = os.path.basename(image_path)
             image_msg   = filename + ' uploaded!'
             msg         = image_msg + '\n' + 'Classification result: ' + response.text
             #print(f"[Workload-gen] {msg}")
-            responses   +=1
+            passed_requests   +=1
             correct_result = prediction_df.loc[prediction_df['Image'] == filename.split('.')[0], 'Results'].iloc[0]
             if correct_result.strip() == response.text.split(':')[1].strip():
                 correct_predictions +=1
             else:
                 wrong_predictions +=1
-    except requests.exceptions.RequestException as errex:
+    except (requests.exceptions.RequestException, Exception) as errex:
         print("Exception:", errex)
-        ex_requests.append(image_path)
+        failed_requests +=1
 
 num_max_workers = 100
 image_path_list = []
@@ -69,27 +68,13 @@ for i, name in enumerate(os.listdir(image_folder)):
 with ThreadPoolExecutor(max_workers = num_max_workers) as executor:
     executor.map(send_one_request, image_path_list)
 
-print(f"[Workload-gen] Attempt-1 {responses}/{num_request} requests successful.")
-
-# Retry requests until all requests are successful or ex_requests is empty
-retry_attempt=2
-while ex_requests:
-    retry_requests = ex_requests.copy()
-    ex_requests.clear()
-    with ThreadPoolExecutor(max_workers=num_max_workers) as executor:
-        executor.map(send_one_request, retry_requests)
-    print(f"[Workload-gen] Attempt-{retry_attempt} {responses}/{num_request} requests successful.")
-    retry_attempt += 1
-
 test_duration = time.time() - test_start_time
-print("[Workload-gen] All requests have been processed or retried.")
 
-if num_request == (responses + err_responses):
-   print (f"[Workload-gen] ----- Workload Generator Statistics -----")
-   print (f"[Workload-gen] Total number of requests: {num_request}")
-   print (f"[Workload-gen] Total number of requests completed successfully: {responses}")
-   print (f"[Workload-gen] Total number of failed requests: {err_responses}")
-   print (f"[Workload-gen] Total number of correct predictions : {correct_predictions}")
-   print (f"[Workload-gen] Total number of wrong predictions: {wrong_predictions}")
-   print (f"[Workload-gen] Total Test Duration: {test_duration} (seconds)")
-   print (f"[Workload-gen] -----------------------------------")
+print (f"[Workload-gen] ----- Workload Generator Statistics -----")
+print (f"[Workload-gen] Total number of requests: {num_request}")
+print (f"[Workload-gen] Total number of requests completed successfully: {passed_requests}")
+print (f"[Workload-gen] Total number of failed requests: {failed_requests}")
+print (f"[Workload-gen] Total number of correct predictions : {correct_predictions}")
+print (f"[Workload-gen] Total number of wrong predictions: {wrong_predictions}")
+print (f"[Workload-gen] Total response time: {test_duration} (seconds)")
+print (f"[Workload-gen] -----------------------------------")

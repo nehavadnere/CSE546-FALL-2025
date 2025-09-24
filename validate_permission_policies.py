@@ -1,7 +1,4 @@
 
-__copyright__   = "Copyright 2025, VISA Lab"
-__license__     = "MIT"
-
 """
 File: grade_project0.py
 Author: Kritshekhar Jha
@@ -33,7 +30,7 @@ class iam_policies():
         self.logger                 = logger
 
         self.print_and_log(self.logger, "-----------------------------------------------------------------")
-        self.print_and_log(self.logger, f"IAM ACESS KEY ID: {self.iam_access_keyId}")
+        self.print_and_log(self.logger, f"IAM ACCESS KEY ID: {self.iam_access_keyId}")
         self.print_and_log(self.logger, f"IAM SECRET ACCESS KEY: {self.iam_secret_access_key}")
         self.print_and_log(self.logger, "-----------------------------------------------------------------")
 
@@ -64,61 +61,16 @@ class iam_policies():
             self.print_and_log_error(self.logger, "[IAM-log] AmazonEC2ReadOnlyAccess policy NOT attached with grading IAM")
         return policy_exits
 
-        '''
-        if policy_exits:
-            try:
-                self.print_and_log(self.logger, "[EC2-log] Trying to create a EC2 instance")
-                TAG_SPEC = [{"ResourceType":"instance","Tags": [{"Key": "Name","Value": "project0"}]}]
-                new_instance  = self.ec2_resources.create_instances(
-                                    ImageId   = "ami-0a8b4cd432b1c3063",
-                                    MinCount  = 1,
-                                    MaxCount  = 1,
-                                    InstanceType ='t2.micro',
-                                    TagSpecifications = TAG_SPEC)
+    def validate_sqs(self, attached_policies):
 
-                self.print_and_log_error(self.logger, f"[IAM-log] Waiting for the instance project0  to change state to running")
-                instance = new_instance[0]
-                instance.wait_until_running()
-                instance.load()
-                self.print_and_log_error(self.logger, f"[IAM-log] A new EC2 instance:project0 was created with InstanceId:{ instance.id}")
-                return False
-
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'UnauthorizedOperation':
-                    comments = "[IAM-log] EC2 instance creation failed with UnauthorizedOperation error. This is as expected."
-                    self.print_and_log(self.logger, comments)
-                    return True
-        else:
-            comments = "[IAM-log] AmazonEC2ReadOnlyAccess policy NOT attached with grading IAM."
-            self.print_and_log_error(self.logger, comments)
-            return False
-        '''
-
-
-    def validate_sqs_queues(self, attached_policies):
-
-        if "AmazonSQSReadOnlyAccess" in attached_policies:
+        if "AmazonSQSFullAccess" in attached_policies:
             policy_exits = True
-            self.print_and_log(self.logger, "[IAM-log] AmazonSQSReadOnlyAccess policy attached with grading IAM")
+            self.print_and_log(self.logger, "[IAM-log] AmazonSQSFullAccess policy attached with grading IAM")
         else:
             policy_exits = False
+            self.print_and_log(self.logger, "[IAM-log] AmazonSQSFullAccess policy NOT attached with grading IAM")
 
-        if policy_exits:
-            try:
-                self.print_and_log(self.logger, "[IAM-log] Trying to create a SQS queue")
-                response = self.requestQ.create_queue(QueueName = "test-sqs")
-                comments = "[IAM-log] SQS queue successfully created. This is NOT expected."
-                self.print_and_log_error(self.logger, comments)
-                return False
-            except ClientError as e:
-                if e.response['Error']['Code'] == 'AccessDenied':
-                    comments = "[IAM-log] SQS creation failed with Access Denied error. This is expected."
-                    self.print_and_log(self.logger, comments)
-                    return True
-        else:
-            comments = "[IAM-log] AmazonSQSReadOnlyAccess policy NOT attached with grading IAM."
-            self.print_and_log_error(self.logger, comments)
-            return False
+        return policy_exits
 
     def validate_s3(self, attached_policies):
 
@@ -140,17 +92,19 @@ class iam_policies():
             policy_names = [policy['PolicyName'] for policy in attached_policies['AttachedPolicies']]
             self.print_and_log(self.logger, f"Following policies are attached with IAM user:cse546-AutoGrader: {policy_names}")
 
-            iam_ro_access_flag  = True
-            ec2_ro_access_flag  = self.validate_ec2_instance(policy_names)
-            s3_full_access_flag = self.validate_s3(policy_names)
-            return iam_ro_access_flag, ec2_ro_access_flag, s3_full_access_flag
+            iam_ro_access_flag   = True
+            ec2_ro_access_flag   = self.validate_ec2_instance(policy_names)
+            s3_full_access_flag  = self.validate_s3(policy_names)
+            sqs_full_access_flag = self.validate_sqs(policy_names)
+            return iam_ro_access_flag, ec2_ro_access_flag, s3_full_access_flag, sqs_full_access_flag
 
         except ClientError as e:
             iam_ro_access_flag   = False
             ec2_ro_access_flag   = None
             s3_full_access_flag  = None
+            sqs_full_access_flag = None
             self.print_and_log_error(self.logger, f"Failed to fetch the attached polices. {e}")
-            return iam_ro_access_flag, ec2_ro_access_flag, s3_full_access_flag
+            return iam_ro_access_flag, ec2_ro_access_flag, s3_full_access_flag, sqs_full_access_flag
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Upload images')
