@@ -3,12 +3,12 @@
 Make sure that you use the provided autograder and follow the instructions below to test your project submission. Failure to do so may cause you to lose all the project points and there will be absolutely no second chance.
 
 - Download the zip file you submitted from Canvas. 
-- Download the autograder from GitHub: `https://github.com/CSE546-Cloud-Computing/CSE546-SPRING-2025.git`
+- Download the autograder from GitHub: `https://github.com/nehavadnere/CSE546-FALL-2025.git`
   - In order to clone the GitHub repository follow the below steps:
-  - `git clone https://github.com/CSE546-Cloud-Computing/CSE546-SPRING-2025.git`
-  - `cd CSE546-SPRING-2025/`
+  - `git clone https://github.com/CSE546-Cloud-Computing/CSE546-FALL-2025.git`
+  - `cd CSE546-FALL-2025/`
   - `git checkout project-2-part-1`
-- Create a directory `submissions` in the CSE546-SPRING-2025 directory and move your zip file to the submissions directory.
+- Create a directory `submissions` in the CSE546-FALL-2025 directory and move your zip file to the submissions directory.
 
 ## Prepare to run the autograder
 - Install Python: `sudo apt install python3`
@@ -32,17 +32,17 @@ Make sure that you use the provided autograder and follow the instructions below
 - 2) Execute the test cases as per the Grading Rubrics
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ++++++++++++++++++++++++++++ Autograder Configurations ++++++++++++++++++++++++++++
-Project Path: /home/local/ASUAD/kjha9/git/GTA-CSE546-SPRING-2025/Project-2/part-1/grader
+Project Path: /home/local/ASUAD/user/git/GTA-CSE546-FALL-2025/Project-2/part-1/grader
 Grade Project: Project-1
 Class Roster: class_roster.csv
-Zip folder path: /home/local/ASUAD/kjha9/git/GTA-CSE546-SPRING-2025/Project-2/part-1/grader/submissions
-Grading script: /home/local/ASUAD/kjha9/git/GTA-CSE546-SPRING-2025/Project-2/part-1/grader/grade_project2_p1.py
+Zip folder path: /home/local/ASUAD/user/git/GTA-CSE546-FALL-2025/Project-2/part-1/grader/submissions
+Grading script: /home/local/ASUAD/user/git/GTA-CSE546-FALL-2025/Project-2/part-1/grader/grade_project2_p1.py
 Test Image folder path: ../../datasets/frames
 Classification results file: ../../datasets/FaceRecognitionResults.csv
 Autograder Results: Project-1-grades.csv
 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ++++++++++++++++++ Grading for Doe John ASUID: 1225754101 +++++++++++++++++++++
-Extracted /home/local/ASUAD/kjha9/git/GTA-CSE546-SPRING-2025/Project-2/part-1/grader/submissions/Project2-1225754101.zip to extracted
+Extracted /home/local/ASUAD/user/git/GTA-CSE546-FALL-2025/Project-2/part-1/grader/submissions/Project2-1225754101.zip to extracted
 File: extracted/credentials/credentials.txt has values ('XXXXXXXXXXX, 'XXXXXXXXXXX, ''XXXXXXXXXXX', ''XXXXXXXXXXX')
 Credentials parsing complete.
 -----------------------------------------------------------------
