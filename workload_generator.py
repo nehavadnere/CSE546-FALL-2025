@@ -1,95 +1,190 @@
-__copyright__   = "Copyright 2024, VISA Lab"
-__license__     = "MIT"
-
-import sys
 import os
+import json
 import time
-import _thread
+import uuid
+import boto3
+import base64
 import argparse
 import requests
-import subprocess
-import numpy as np
-import pandas as pd
 import threading
-from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures import as_completed
+import pandas as pd
 
-parser = argparse.ArgumentParser(description='Upload images')
-parser.add_argument('--num_request', type=int, help='one image per request')
-parser.add_argument('--ip_addr', type=str, help='IP address of the web tier')
-parser.add_argument('--image_folder', type=str, help='the path of the folder where images are saved')
-parser.add_argument('--prediction_file', type=str, help='the path of the classification results file')
+# Argument parser
+parser = argparse.ArgumentParser(description="Workload Generator")
+parser.add_argument("--access_keyID", type=str, help="access key id of the iam user")
+parser.add_argument("--access_key", type=str, help="access key of the iam user")
+parser.add_argument("--num_request", type=int, help="Total number of requests to send")
+parser.add_argument("--lambda_url", type=str, help="URL of the entry Lambda function")
+parser.add_argument("--response_queue_url", type=str, help="URL of the Response SQS Queue")
+parser.add_argument("--image_folder", type=str, help="Path of the folder where images are saved")
+parser.add_argument("--prediction_file", type=str, help="Path of the classification results file")
 args = parser.parse_args()
 
-num_request     = args.num_request
-url             = f"http://{args.ip_addr}:8000/"
-image_folder    = args.image_folder
-prediction_file = args.prediction_file
-prediction_df   = pd.read_csv(prediction_file)
-responses       = 0
-err_responses   = 0
+# Load arguments
+access_keyid        = args.access_keyID
+access_key          = args.access_key
+num_request         = args.num_request
+lambda_url          = args.lambda_url
+response_queue_url  = args.response_queue_url
+image_folder        = args.image_folder
+prediction_file     = args.prediction_file
+#timer_interval      = args.timer_interval
+
+# AWS SQS client
+iam_session         = boto3.Session(aws_access_key_id = access_keyid,
+                                    aws_secret_access_key = access_key)
+sqs                 = iam_session.client('sqs',    'us-east-1')
+
+# Tracking statistics
+passed_requests     = 0
+failed_requests     = 0
 correct_predictions = 0
 wrong_predictions   = 0
-ex_requests         = []
+image_index         = 0
+prediction_df       = pd.read_csv(prediction_file)
+
+# Load image paths
+image_path_list = [
+    os.path.join(image_folder, f) for f in os.listdir(image_folder) if f.endswith((".jpg", ".png"))
+]
+
+image_index     = 0
+active_requests = 0
+lock            = threading.Lock()
+
+# Time interval (in seconds) between requests
+timer_interval = 1
+#print(f"Timer interval: {timer_interval}")
+
+def poll_response(sqs, request_id, response_queue_url):
+    """Poll the SQS response queue for the result."""
+    max_wait_time = 300
+    poll_start = time.time()
+
+    while time.time() - poll_start < max_wait_time:
+        try:
+            response_messages = sqs.receive_message(
+                QueueUrl=response_queue_url,
+                MaxNumberOfMessages=1,
+                WaitTimeSeconds=5,
+                MessageAttributeNames=["All"],
+            )
+
+            if "Messages" in response_messages:
+                for message in response_messages["Messages"]:
+                    response_body = json.loads(message["Body"])
+                    received_request_id = response_body.get("request_id", "")
+
+                    if received_request_id == request_id:
+                        #print(f"Received response for {request_id}")
+
+                        try:
+                            sqs.delete_message(
+                                QueueUrl=response_queue_url,
+                                ReceiptHandle=message["ReceiptHandle"],
+                            )
+                        except Exception as delete_error:
+                            print(f"Error deleting message from SQS: {delete_error}")
+
+                        return response_body.get("result", "")
+
+        except Exception as e:
+            print(f"Error polling SQS: {e}")
+            return None
+
+    return {"error": "Timeout waiting for response from Face Recognition"}
+
+def send_request(image_path):
+    """Send a request to Face Detection Lambda **synchronously**."""
+    global passed_requests, failed_requests
+
+    with open(image_path, "rb") as f:
+        encoded_file = base64.b64encode(f.read()).decode("utf-8")
+
+    request_id  = str(uuid.uuid4())
+    payload     = json.dumps({"request_id": request_id, "content": encoded_file, "filename": image_path})
+    headers     = {"Content-Type": "application/json"}
+
+    try:
+        response = requests.post(lambda_url, data=payload, headers=headers)
+
+        if response.status_code != 200:
+            print(f"Failed request {request_id}: {response.url}")
+            failed_requests += 1
+            return None, None
+        else:
+            #print(f"Request {request_id} sent for {os.path.basename(image_path)}")
+            passed_requests += 1
+            filename = image_path.split('/')[-1]
+            return request_id, filename
+
+    except Exception as err:
+        print(f"Exception while sending request: {err}")
+        failed_requests += 1
+        return None, None
+
 
 def send_one_request(image_path):
-    global prediction_df, responses, err_responses, correct_predictions, wrong_predictions, ex_requests
-    # Define http payload, "myfile" is the key of the http payload
-    file = {"inputFile": open(image_path,'rb')}
+    """Sends a request and updates counters"""
+    global sqs, response_queue_url, correct_predictions, wrong_predictions, active_requests, prediction_df
+
+    with lock:
+        # Increment active request count
+        active_requests += 1
+
     try:
-        response = requests.post(url, files=file)
-        # Print error message if failed
-        if response.status_code != 200:
-            print('sendErr: '+response.url)
-            err_responses +=1
-        else :
-            filename    = os.path.basename(image_path)
-            image_msg   = filename + ' uploaded!'
-            msg         = image_msg + '\n' + 'Classification result: ' + response.text
-            #print(f"[Workload-gen] {msg}")
-            responses   +=1
-            correct_result = prediction_df.loc[prediction_df['Image'] == filename.split('.')[0], 'Results'].iloc[0]
-            if correct_result.strip() == response.text.split(':')[1].strip():
-                correct_predictions +=1
-            else:
-                wrong_predictions +=1
-    except requests.exceptions.RequestException as errex:
-        print("Exception:", errex)
-        ex_requests.append(image_path)
+        request_id, filename = send_request(image_path)
+        if request_id and filename:
+            result = poll_response(sqs, request_id, response_queue_url)
+            if result:
+                # Compare with ground truth
+                #print(f"filename: {filename}")
+                ground_truth = prediction_df.loc[prediction_df['Image'] == filename, 'Results'].values[0]
+                if ground_truth.strip() == result:
+                    correct_predictions += 1
+                else:
+                    wrong_predictions += 1
 
-num_max_workers = 100
-image_path_list = []
-test_start_time = time.time()
+    finally:
+        with lock:
+            active_requests -= 1  # Decrement active request count
+            if active_requests == 0 and image_index >= num_request:
+                dump_statistics()
 
-for i, name in enumerate(os.listdir(image_folder)):
-    if i == num_request:
-        break
-    image_path_list.append(os.path.join(image_folder,name))
+def workload_scheduler():
+    """Schedules requests using a timer, launching a new thread for each request."""
+    global image_index
 
-with ThreadPoolExecutor(max_workers = num_max_workers) as executor:
-    executor.map(send_one_request, image_path_list)
+    with lock:
+        if image_index >= num_request:
+            if active_requests == 0:
+                # All requests sent & processed
+                dump_statistics()
+            return
 
-print(f"[Workload-gen] Attempt-1 {responses}/{num_request} requests successful.")
+        image_path = image_path_list[image_index % len(image_path_list)]
+        image_index += 1
 
-# Retry requests until all requests are successful or ex_requests is empty
-retry_attempt=2
-while ex_requests:
-    retry_requests = ex_requests.copy()
-    ex_requests.clear()
-    with ThreadPoolExecutor(max_workers=num_max_workers) as executor:
-        executor.map(send_one_request, retry_requests)
-    print(f"[Workload-gen] Attempt-{retry_attempt} {responses}/{num_request} requests successful.")
-    retry_attempt += 1
+    threading.Thread(target=send_one_request, args=(image_path,)).start()
+    threading.Timer(timer_interval, workload_scheduler).start()
 
-test_duration = time.time() - test_start_time
-print("[Workload-gen] All requests have been processed or retried.")
+def dump_statistics():
+    total_duration = time.time() - start_time
 
-if num_request == (responses + err_responses):
-   print (f"[Workload-gen] ----- Workload Generator Statistics -----")
-   print (f"[Workload-gen] Total number of requests: {num_request}")
-   print (f"[Workload-gen] Total number of requests completed successfully: {responses}")
-   print (f"[Workload-gen] Total number of failed requests: {err_responses}")
-   print (f"[Workload-gen] Total number of correct predictions : {correct_predictions}")
-   print (f"[Workload-gen] Total number of wrong predictions: {wrong_predictions}")
-   print (f"[Workload-gen] Total Test Duration: {test_duration} (seconds)")
-   print (f"[Workload-gen] -----------------------------------")
+    print("Workload complete! Dumping statistics...")
+
+    print (f"[Workload-gen] ----- Workload Generator Statistics -----")
+    print (f"[Workload-gen] Total number of requests: {num_request}")
+    print (f"[Workload-gen] Total number of requests completed successfully: {passed_requests}")
+    print (f"[Workload-gen] Total number of failed requests: {failed_requests}")
+    print (f"[Workload-gen] Total number of correct predictions : {correct_predictions}")
+    print (f"[Workload-gen] Total number of wrong predictions: {wrong_predictions}")
+    print (f"[Workload-gen] Total test duration: {total_duration} (seconds)")
+    print (f"[Workload-gen] ------------------------------------------")
+
+
+# Start the timer-based workload scheduler
+print(f" Starting workload generator... Sending {num_request} requests with timer interval {timer_interval} seconds")
+
+start_time = time.time()
+workload_scheduler()
