@@ -87,7 +87,7 @@ class aws_cloudwatch():
             self.print_and_log_warn(f"[Cloudwatch-log] CAUTION !! You do not have a Cloudwatch alarm set. Kindly refer to the Project-0 document and learn how to set a billing alarm")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Upload images')
+    parser = argparse.ArgumentParser(description='Cloudwatch billing alarm')
     parser.add_argument('--access_keyId', type=str, help='ACCCESS KEY ID of the grading IAM user')
     parser.add_argument('--access_key', type=str, help='SECRET ACCCESS KEY of the grading IAM user')
 
