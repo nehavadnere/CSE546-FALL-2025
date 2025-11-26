@@ -40,7 +40,7 @@ ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
 def generate_sh_file(asuid, max_pub_ops, response_queue_url, image_folder, prediction_file):
     filename    = f"{asu_id}_exec.sh"
-    file_path   = f"{asu_id}_grading/CSE546-SPRING-2025/{filename}"
+    file_path   = f"{asu_id}_grading/CSE546-FALL-2025/{filename}"
 
     thing_name  = f"{asu_id}-IoTThing"
     topic       = f"clients/{asu_id}-IoTThing"
@@ -81,8 +81,8 @@ try:
     pred_file_name      = prediction_file.split('/')[-1]
     dataset_folder_name = image_folder.split('/')[-1]
 
-    git_clone_cmd       = f"cd ./{asu_id}_grading && git clone -b project-2-part-2 git@github.com:CSE546-Cloud-Computing/CSE546-SPRING-2025.git && cd .."
-    code_path           = f"{asu_id}_grading/CSE546-SPRING-2025"
+    git_clone_cmd       = f"cd ./{asu_id}_grading && git clone -b project-2-part-2 git@github.com:CSE546-Cloud-Computing/CSE546-FALL-2025.git && cd .."
+    code_path           = f"{asu_id}_grading/CSE546-FALL-2025"
     sh_filename         = f"{asu_id}_exec.sh"
     sh_file_path        = f"{code_path}/{sh_filename}"
 
@@ -90,8 +90,8 @@ try:
     dataset_cp_cmd      = f"cp -r {image_folder} {code_path}"
     dataset_zip_cmd     = f"zip -r {code_path}/{dataset_folder_name}.zip {image_folder}"
     zip_cmd             = f"zip -r {asu_id}_grading.zip ./{asu_id}_grading/"
-    init_workload_cmd   = f"unzip {asu_id}_grading.zip && cd {asu_id}_grading/CSE546-SPRING-2025 && bash {asu_id}_exec.sh"
-    #init_workload_cmd   = f"cd {asu_id}_grading/CSE546-SPRING-2025 && bash {asu_id}_exec.sh"
+    init_workload_cmd   = f"unzip {asu_id}_grading.zip && cd {asu_id}_grading/CSE546-FALL-2025 && bash {asu_id}_exec.sh"
+    #init_workload_cmd   = f"cd {asu_id}_grading/CSE546-FALL-2025 && bash {asu_id}_exec.sh"
     #iot_cli_scp_cmd     = f"scp -i {pem_file_path} {asu_id}_grading.zip ubuntu@{ip_addr}:~/"
     iot_cli_scp_cmd     = f"scp -o StrictHostKeyChecking=no -i {pem_file_path} {asu_id}_grading.zip ubuntu@{ip_addr}:~/"
     pem_permission_cmd  = f"chmod 600 {pem_file_path}"
