@@ -81,7 +81,8 @@ try:
     pred_file_name      = prediction_file.split('/')[-1]
     dataset_folder_name = image_folder.split('/')[-1]
 
-    git_clone_cmd       = f"cd ./{asu_id}_grading && git clone -b project-2-part-2 git@github.com:nehavadnere/CSE546-FALL-2025.git && cd .."
+    # git_clone_cmd       = f"cd ./{asu_id}_grading && git clone -b project-2-part-2 git@github.com:nehavadnere/CSE546-FALL-2025.git && cd .."
+    git_clone_cmd       = f"cd ./{asu_id}_grading && git clone -b project-2-part-2 https://github.com/nehavadnere/CSE546-FALL-2025.git && cd .."
     code_path           = f"{asu_id}_grading/CSE546-FALL-2025"
     sh_filename         = f"{asu_id}_exec.sh"
     sh_file_path        = f"{code_path}/{sh_filename}"
